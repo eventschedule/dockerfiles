@@ -23,7 +23,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # App source
 ARG APP_REF=main
 WORKDIR /var/www/html
-RUN git clone --depth 1 --branch "${APP_REF}" https://github.com/dfiore1230/eventschedule.git /var/www/html
+RUN git clone --depth 1 --branch "${APP_REF}" https://github.com/eventschedule/eventschedule.git /var/www/html
 
 # Fix "dubious ownership"
 RUN git config --global --add safe.directory /var/www/html
