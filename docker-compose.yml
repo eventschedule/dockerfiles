@@ -1,0 +1,84 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+      args:
+        APP_REF: main
+    env_file: .env
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:-change_me}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - storage:/var/www/html/storage
+      - vendor:/var/www/html/vendor
+      - node_modules:/var/www/html/node_modules
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    command: ["php-fpm", "-F"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    # Nginx only needs runtime-uploaded files; avoid masking bundled code
+    volumes:
+      - storage:/var/www/html/storage:ro
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11
+    environment:
+      MYSQL_DATABASE: eventschedule
+      MYSQL_USER: eventschedule
+      MYSQL_PASSWORD: ${DB_PASSWORD:-change_me}
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+      args:
+        APP_REF: main
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:-change_me}
+    command: ["sh", "-lc", "while :; do php artisan schedule:run --verbose --no-interaction || true; sleep 60; done"]
+    restart: unless-stopped
+    volumes:
+      - storage:/var/www/html/storage
+      - vendor:/var/www/html/vendor
+      - node_modules:/var/www/html/node_modules
+
+volumes:
+  dbdata:
+  storage:
+  vendor:
+  node_modules:
+
