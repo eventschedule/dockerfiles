@@ -16,6 +16,12 @@ RUN docker-php-ext-configure gd --with-jpeg --with-freetype \
  && docker-php-ext-install \
     pdo pdo_mysql mbstring exif pcntl bcmath intl opcache zip gd
 
+# Raise PHP upload limits to accommodate large files
+RUN { \
+      echo 'upload_max_filesize=500M'; \
+      echo 'post_max_size=500M'; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
 # Composer
 ENV COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -28,10 +34,15 @@ RUN git clone --depth 1 --branch "${APP_REF}" https://github.com/eventschedule/e
 # Fix "dubious ownership"
 RUN git config --global --add safe.directory /var/www/html
 
+# Replace AppServiceProvider with a version compatible with non-interactive builds
+COPY patches/AppServiceProvider.php /tmp/AppServiceProvider.php
+RUN cp /tmp/AppServiceProvider.php /var/www/html/app/Providers/AppServiceProvider.php \
+ && rm /tmp/AppServiceProvider.php
+
 # Gate any forceScheme('https') behind FORCE_HTTPS
-RUN grep -q "forceScheme('https')" app/Providers/AppServiceProvider.php \
-  && sed -i "s/URL::forceScheme('https');/if (env('FORCE_HTTPS', false)) { URL::forceScheme('https'); }/" app/Providers/AppServiceProvider.php \
-  || true
+COPY scripts/force_https_patch.php /tmp/force_https_patch.php
+RUN php /tmp/force_https_patch.php /var/www/html \
+ && rm /tmp/force_https_patch.php
 
 # Ensure .env exists BEFORE composer (artisan post-scripts expect it)
 RUN [ -f .env ] || cp .env.example .env
