@@ -5,7 +5,7 @@ This repository provides a Docker-based runtime for the [EventSchedule](https://
 ## Features
 
 - **Multi-service stack**: PHP-FPM application container, Nginx web server, MariaDB database, and a dedicated scheduler runner.
-- **Automated bootstrap**: Composer dependencies and frontend assets are built into the image; database migrations and (when unset) the application key are provisioned automatically when the containers start.
+- **Automated bootstrap**: Composer dependencies, frontend assets, and the application key are baked into the image at build time; database migrations run automatically when the containers start.
 - **Persistent volumes**: Shared Docker volumes retain database data and uploaded files between restarts.
 - **Configurable upstream branch**: Build arguments allow pinning to a specific EventSchedule git reference.
 
@@ -45,11 +45,11 @@ The first startup can take several minutes while dependencies are installed and 
 Key settings are defined in `.env` and forwarded into the containers. At a minimum you should set `DB_PASSWORD`. Additional variables supported by Laravel (e.g., `MAIL_` settings) can be added to tailor the runtime.
 
 - **`APP_URL`** defaults to `http://localhost:8080`. Set it to the address users actually reach, otherwise generated links and emails point to localhost.
-- **`APP_KEY`** is generated automatically on first start if left blank, but that key then lives only inside the container and is regenerated whenever the container is recreated (logging users out and breaking previously encrypted data). For anything beyond throwaway local testing, set a fixed key once and keep it in `.env`:
+- **`APP_KEY`** is generated into the image when it is built, so it stays stable across container restarts but changes whenever you rebuild the image (logging users out and breaking previously encrypted data). For a key that survives rebuilds, generate one and keep it in `.env`:
   ```bash
   docker compose run --rm app php artisan key:generate --show
   ```
-  Uncomment the `APP_KEY=` line in `.env` and paste the printed value; it is then shared by the `app` and `scheduler` services via `env_file`.
+  Uncomment the `APP_KEY=` line in `.env` and paste the printed value; it then overrides the built-in key for both the `app` and `scheduler` services via `env_file`.
 
 The Dockerfile clones the upstream EventSchedule repository. You can change the source branch or tag by editing `APP_REF` in `docker-compose.yml` or passing `--build-arg APP_REF=...` to `docker compose build`.
 
