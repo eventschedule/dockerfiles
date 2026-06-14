@@ -50,9 +50,12 @@ RUN cp .env .env.dockerbuild \
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader \
  && mv .env.dockerbuild .env
 
-# Frontend build (tolerant)
-RUN [ -f package-lock.json ] && npm ci || true
-RUN [ -f package.json ] && npm run build || true
+# Frontend build -- must produce the Vite manifest, or @vite throws at runtime and every
+# page (including the setup wizard) 500s. public/build is gitignored upstream, so the image
+# depends entirely on this build; assert the manifest exists rather than failing silently.
+RUN if [ -f package-lock.json ]; then npm ci; fi
+RUN if [ -f package.json ]; then npm run build; fi
+RUN test -f public/build/manifest.json
 
 # Laravel perms + storage symlink
 RUN mkdir -p storage bootstrap/cache \
