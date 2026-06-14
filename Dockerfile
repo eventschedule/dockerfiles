@@ -34,11 +34,6 @@ RUN git clone --depth 1 --branch "${APP_REF}" https://github.com/eventschedule/e
 # Fix "dubious ownership"
 RUN git config --global --add safe.directory /var/www/html
 
-# Replace AppServiceProvider with a version compatible with non-interactive builds
-COPY patches/AppServiceProvider.php /tmp/AppServiceProvider.php
-RUN cp /tmp/AppServiceProvider.php /var/www/html/app/Providers/AppServiceProvider.php \
- && rm /tmp/AppServiceProvider.php
-
 # Ensure .env exists BEFORE composer (artisan post-scripts expect it)
 RUN [ -f .env ] || cp .env.example .env
 
@@ -50,26 +45,6 @@ RUN cp .env .env.dockerbuild \
  && php -r '$path=".env"; $env=file_get_contents($path); $env=preg_replace("/^DB_CONNECTION=.*/m", "DB_CONNECTION=sqlite", $env, 1, $c1); if(!$c1){$env.="\nDB_CONNECTION=sqlite";} $env=preg_replace("/^DB_DATABASE=.*/m", "DB_DATABASE=database/database.sqlite", $env, 1, $c2); if(!$c2){$env.="\nDB_DATABASE=database/database.sqlite";} file_put_contents($path, $env);' \
  && mkdir -p database \
  && touch database/database.sqlite
-
-# Enable public registration in common stacks (no route edits here)
-RUN if [ -f config/fortify.php ]; then \
-  php -r '$f=\"config/fortify.php\";$s=file_get_contents($f);if(strpos($s,\"Features::registration()\")===false){$s=preg_replace(\"/(\\'features\\'\\s*=>\\s*\\[)/\",\"$1\\n        Laravel\\\\Fortify\\\\Features::registration(),\",$s,1);} file_put_contents($f,$s);'; \
-fi
-RUN if [ -f config/jetstream.php ]; then \
-  php -r '$f=\"config/jetstream.php\";$s=file_get_contents($f);if(strpos($s,\"Features::registration()\")===false){$s=preg_replace(\"/(\\'features\\'\\s*=>\\s*\\[)/\",\"$1\\n        Laravel\\\\Jetstream\\\\Features::registration(),\",$s,1);} file_put_contents($f,$s);'; \
-fi
-RUN if [ -f routes/web.php ]; then \
-  php -r '$f="routes/web.php"; $s=file_get_contents($f); $s=preg_replace("/Auth::routes\\(([^;]*'"'"'register'"'"'\\s*=>\\s*)false/", "Auth::routes($1true", $s, -1, $c); if ($c) file_put_contents($f, $s);'; \
-fi
-
-# --- SIGN-UP OVERRIDE: copy file and require it at end of routes/web.php ---
-COPY routes/_sign_up_override.php /var/www/html/routes/_sign_up_override.php
-RUN printf "\n// Allow public sign up without redirecting to /login\nrequire __DIR__.'/_sign_up_override.php';\n" >> routes/web.php
-
-# Skip settings bootstrap when no DB is available (eg. during image build)
-COPY scripts/skip_settings_bootstrap.php /tmp/skip_settings_bootstrap.php
-RUN php /tmp/skip_settings_bootstrap.php /var/www/html \
- && rm /tmp/skip_settings_bootstrap.php
 
 # PHP deps
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader \
@@ -99,4 +74,3 @@ FROM nginx:1.27-alpine AS web
 COPY --from=app /var/www/html /var/www/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN test -d /var/www/html/public
-
