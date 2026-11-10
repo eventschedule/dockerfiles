@@ -57,6 +57,15 @@ RUN if [ -f package-lock.json ]; then npm ci; fi
 RUN if [ -f package.json ]; then npm run build; fi
 RUN test -f public/build/manifest.json
 
+# The app keeps data files in storage/ (gradients.json, currencies.json, fonts.json ...), and
+# storage/ is a named volume at run time. Docker copies the image's files into a volume only
+# when it is created empty, so a volume from an earlier install never has them, and one that
+# did keeps old copies after every rebuild. Keep a copy outside storage/ for the entrypoint to
+# put back on each start.
+RUN mkdir -p /usr/local/share/eventschedule \
+ && git ls-files 'storage/*.json' | tar -cf /usr/local/share/eventschedule/storage-files.tar -T - \
+ && tar -tf /usr/local/share/eventschedule/storage-files.tar | grep -q 'storage/gradients.json'
+
 # Laravel perms + storage symlink
 RUN mkdir -p storage bootstrap/cache \
  && chown -R www-data:www-data storage bootstrap public \
@@ -64,7 +73,8 @@ RUN mkdir -p storage bootstrap/cache \
 
 # Entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY check-app-key.sh /usr/local/bin/check-app-key
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/check-app-key
 
 # Default command
 CMD ["php-fpm", "-F"]

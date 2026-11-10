@@ -70,7 +70,7 @@ services:
     # Run as the php-fpm user so files written to the shared storage volume are owned by
     # www-data (matching the app service), not root.
     user: "www-data"
-    command: ["sh", "-lc", "while :; do php artisan schedule:run --verbose --no-interaction || true; sleep 60; done"]
+    command: ["sh", "-lc", "check-app-key && while :; do php artisan schedule:run --verbose --no-interaction || true; sleep 60; done"]
     restart: unless-stopped
     volumes:
       - storage:/var/www/html/storage

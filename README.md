@@ -49,7 +49,7 @@ Key settings are defined in `.env` and forwarded into the containers. At a minim
   ```bash
   docker compose run --rm app php artisan key:generate --show
   ```
-  Uncomment the `APP_KEY=` line in `.env` and paste the printed value; it then overrides the built-in key for both the `app` and `scheduler` services via `env_file`.
+  Uncomment the `APP_KEY=` line in `.env` and paste the printed value, `base64:` prefix included; it then overrides the built-in key for both the `app` and `scheduler` services via `env_file`. Run `docker compose up -d` afterwards (a `restart` does not re-read `.env`). If the key is one Laravel cannot use (most often, the `base64:` prefix was left off), the `app` and `scheduler` containers stop at start-up and `docker compose logs app` says what is wrong with it.
 
 The Dockerfile clones the upstream EventSchedule repository. You can change the source branch or tag by editing `APP_REF` in `docker-compose.yml` or passing `--build-arg APP_REF=...` to `docker compose build`.
 
