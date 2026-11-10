@@ -51,6 +51,19 @@ Key settings are defined in `.env` and forwarded into the containers. At a minim
   ```
   Uncomment the `APP_KEY=` line in `.env` and paste the printed value, `base64:` prefix included; it then overrides the built-in key for both the `app` and `scheduler` services via `env_file`. Run `docker compose up -d` afterwards (a `restart` does not re-read `.env`). If the key is one Laravel cannot use (most often, the `base64:` prefix was left off), the `app` and `scheduler` containers stop at start-up and `docker compose logs app` says what is wrong with it.
 
+### Behind an HTTPS reverse proxy
+
+For a real deployment the stack usually sits behind a proxy that terminates TLS (nginx, Traefik, Caddy, Cloudflare ...) and forwards to the `web` service. Set these four in `.env`, then run `docker compose up -d`:
+
+```bash
+APP_URL=https://events.example.com
+APP_ENV=production
+SESSION_SECURE_COOKIE=true
+TRUSTED_PROXIES=*
+```
+
+`TRUSTED_PROXIES` can be the proxy's IP or range instead of `*`. The proxy must pass `X-Forwarded-Proto` (and `Host` or `X-Forwarded-Host`); the bundled nginx passes the proxy's `X-Forwarded-Proto` on to the app. Without these settings the pages load but every form answers **419 Page Expired**, because the session cookie does not come back with the form; Laravel does not log a 419. After changing them, clear the site's cookies in the browser once.
+
 The Dockerfile clones the upstream EventSchedule repository. You can change the source branch or tag by editing `APP_REF` in `docker-compose.yml` or passing `--build-arg APP_REF=...` to `docker compose build`.
 
 ## Operational Tips
